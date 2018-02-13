@@ -19,15 +19,3 @@ Portal Types: SonicWallVOffice
               PaloAlto (GlobalProtect)
               SharePoint
               AUTO (Attempt autodetect module)
-
-Type @SAME@ : Password=Username
-DISABLE_CHECK : Disable Check if compatible Portal.
-DEBUG : outputs HTTP responses to file
-LOG : outputs stdout to file
-THREAD : Threading of POST requests to server
-
-syntax examples.
-conformer.sh domain.example.com username ~/Desktop/passwords CiscoSSLVPN
-conformer.sh domain.example.com ~/Desktop/users ~/Desktop/passwords OWA THREAD=10
-conformer.sh domain.example.com username password123 Gmail LOG=~/Desktop/log DEBUG=~/Desktop/debug
-conformer.sh domain.example.com ~/Desktop/users Password1 Netscaler DISABLE_CHECK DEBUG=~/Desktop/debug
