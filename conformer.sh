@@ -10,10 +10,11 @@ source $mydir/modules/Office365.sh &> /dev/null;
 source $mydir/modules/PaloAlto.sh &> /dev/null;
 source $mydir/modules/SharePoint.sh &> /dev/null;
 source $mydir/modules/AUTO.sh &> /dev/null;
+source $mydir/modules/SMB.sh &> /dev/null;
 
 #Help Banner Function...
 Help_banner(){
-if [[ ! -f $mydir/modules/SonicWallVOffice.sh ]] || [[ ! -f $mydir/modules/CiscoSSLVPN.sh ]] || [[ ! -f $mydir/modules/Netscaler.sh ]] || [[ ! -f $mydir/modules/OWA2016.sh ]] || [[ ! -f $mydir/modules/Gmail.sh ]] || [[ ! -f $mydir/modules/Office365.sh ]] || [[ ! -f $mydir/modules/PaloAlto.sh ]] || [[ ! -f $mydir/modules/SharePoint.sh ]] || [[ ! -f $mydir/modules/AUTO.sh ]] ; then
+if [[ ! -f $mydir/modules/SonicWallVOffice.sh ]] || [[ ! -f $mydir/modules/CiscoSSLVPN.sh ]] || [[ ! -f $mydir/modules/Netscaler.sh ]] || [[ ! -f $mydir/modules/OWA2016.sh ]] || [[ ! -f $mydir/modules/Gmail.sh ]] || [[ ! -f $mydir/modules/Office365.sh ]] || [[ ! -f $mydir/modules/PaloAlto.sh ]] || [[ ! -f $mydir/modules/SharePoint.sh ]] || [[ ! -f $mydir/modules/AUTO.sh ]] || [[ ! -f $mydir/modules/SMB.sh ]] ; then
 echo "Not All Modules Loaded.";
 echo "Exiting...";
 exit 1;
@@ -21,7 +22,7 @@ else
 :
 fi
 
-echo "conformer v0.5.1";
+echo "conformer v0.5.3";
 echo "bk201@foofus.net";
 echo "";
 echo "usage: conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File> 
@@ -37,7 +38,10 @@ echo "Portal Types: SonicWallVOffice
               Office365 (Host: outlook.office.com)
               PaloAlto (GlobalProtect)
               SharePoint
-              AUTO (Attempt autodetect module)"; #XenApp";
+              AUTO (Attempt autodetect module)
+              --------------------------------
+              SMB (Windows Auth. / supports NT Hash)"; #XenApp";
+
 
 echo "";
 echo "Type @SAME@ : Password=Username"
@@ -65,16 +69,25 @@ Help_banner "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 
 #Wgets the host parameter. Checks host is up, has a webserver, using SSL/TLS.
 elif [ "$1" != "" ]; then
-#host_check=$(wget --timeout=4 -qO- https://$1 --no-check-certificate);
-host_check=$(curl -i -s -k  -X $'GET' \
-    -H $'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0' \
-    $'https://'$1'/');
-if [[ "$host_check" != "" ]]; then
-:
-else
-echo "Invalid Host, or check your internet connection.";
-echo "Exiting...";
-exit 1;
+	if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]' ) == "disable_check" ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "disable_check" ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "disable_check" ]] || [[ $(echo "$8" | tr '[:upper:]' '[:lower:]') == "disable_check" ]] ; then
+	:
+	else
+	#host_check=$(wget --timeout=4 -qO- https://$1 --no-check-certificate);
+	host_check=$(curl -i -s -k  -X $'GET' \
+	    -H $'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0' \
+	    $'https://'$1'/');
+	if [[ "$host_check" != "" ]]; then
+	:
+	else
+		PING_CHECK=$(ping -c 1 -t 8 -W 1 -i 0.2 "$1" 2>/dev/null);
+		if [[ $PING_CHECK != *"64 bytes from"* ]] ; then
+			echo "Invalid Host, or check your internet connection.";
+			echo "Exiting...";
+			exit 1;
+		else
+		:
+		fi
+	fi
 fi
 
 
@@ -117,7 +130,8 @@ elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "sharepoint" ]]; then
 	check_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "auto" ]]; then
 	check_Start "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
-
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "smb" ]]; then
+	SMB_CHECK "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "gmail" ]]; then
 	:
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "office365" ]]; then
@@ -171,7 +185,7 @@ fi
 fi
 
 echo "";
-if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "netscaler" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "paloalto" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sharepoint" ]] ; then
+if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "netscaler" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "paloalto" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sharepoint" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "smb" ]] ; then
 echo "Host: $1";
 if [[ $LOG_YES == true ]]; then
 	echo "Host: $1" >> "$LOG";
@@ -235,6 +249,8 @@ elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "paloalto" ]]; then
 	POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
 	POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
+	SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 fi
 
 else  #Username + Password File
@@ -264,6 +280,8 @@ line=$2;
 
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
+			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
 		if [[ $com == $THREAD ]] ; then
 		wait $!;
@@ -306,9 +324,11 @@ if [ ! -f "$3" ]; then
 			POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
+			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
 		if [[ $com == $THREAD ]] ; then
-		wait $!;
+		wait $! 2> /dev/null;
 		com=0;
 		fi
 	done
@@ -335,6 +355,8 @@ else
 			POST_PaloAlto "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
+			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
 		if [[ $com == $THREAD ]] ; then
 		wait $!;

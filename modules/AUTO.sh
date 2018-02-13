@@ -64,6 +64,16 @@ check_SonicWallVOffice_auto(){
 
 }
 
+SMB_CHECK_auto(){
+	check_Portal=$(rpcclient -U "" -N "$1" -c quit);
+	if [[ $(echo "$check_Portal" | grep 'Error was NT_STATUS_ACCESS_DENIED') ]] || [[ $(echo $check_Portal) == "" ]] ; then
+		Portal_Type="SMB"
+	else
+		:
+	fi
+}
+
+
 check_Start(){
 	Portal_Type="unknown";
 	check_CiscoSSLVPN_auto "$1";
@@ -72,6 +82,7 @@ check_Start(){
 	check_PaloAlto_auto "$1";
 	check_SharePoint_auto "$1";
 	check_SonicWallVOffice_auto "$1";
+	SMB_CHECK_auto "$1" &> /dev/null;
 
 	if [ "$Portal_Type" != "unknown" ] ; then
 		parameter_check "$1" "$2" "$3" "$Portal_Type" "$5" "$6" "$7" "$8";
