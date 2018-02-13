@@ -62,7 +62,18 @@ echo "";
 parameter_check(){
 #Where script would Update
 if [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "update" ]]; then
-echo "Update from github/svn/repo goes here...";
+rm conformer.sh;
+wget https://raw.githubusercontent.com/mikhbur/conformer/master/conformer.sh &> /dev/null;
+chmod +x conformer.sh;
+wget --timeout=4 -qO- https://github.com/mikhbur/conformer/tree/master/modules -O TODOWNLOAD;
+rm -r modules
+mkdir modules;
+for i in $(cat TODOWNLOAD | tr ' ' '/' | tr '"' '/' | cut -d "/" -f 25 |  grep ".sh"); do
+
+wget https://raw.githubusercontent.com/mikhbur/conformer/master/modules/$i -O modules/$i &> /dev/null;
+
+done
+rm TODOWNLOAD;
 
 elif [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "help" ]] || [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "--help" ]] || [[ $(echo "$1" | tr '[:upper:]' '[:lower:]')  == "-h" ]]; then
 Help_banner "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
