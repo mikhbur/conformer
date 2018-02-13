@@ -2,7 +2,7 @@
 
 Conformer is a tool used for pentesting clients with very common web portals.
 
-conformer v0.5.1
+conformer v0.5.3
 bk201@foofus.net
 
 usage: conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File> 
