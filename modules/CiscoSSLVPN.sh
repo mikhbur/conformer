@@ -71,6 +71,7 @@ fi
 			    -b $'webvpnlogin=1; webvpnlogin=1; webvpnLang=en' \
 			    --data-binary $'tgroup=&next=&tgcookieset=&username='$line'&password='$pass'&Login=Login' \
 			    $'https://'$1'/+webvpn+/index.html');
+
 		#If Logging is enabled loop userlist
 		if [[ $DEBUG_YES == true ]]; then
 			echo "host:$1 username:$line password:$pass" >> "$DEBUG";
