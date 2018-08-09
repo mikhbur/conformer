@@ -1,0 +1,160 @@
+Key features:
+
+    Basic Detection of Web Portals
+    Modular
+        SonicWallVOffice (SonicWall Virtual Office)
+        CiscoSSLVPN
+        Netscaler (Citrix Netscaler)
+        OWA (Versions 2013/2016)
+        Gmail (mail.google.com)
+        Office365 (outlook.office.com)
+        PaloAlto (GlobalProtect VPN)
+        SharePoint (Not Office365 integrated)
+        XenMobile
+        AUTO (Autodetect module) (Can't be used with disable_check flag)
+        SMB (Windows Auth. / supports NT Hash)
+    Password=Username option
+    Combo File option
+    Threading
+    Non-standard Ports
+    Log and Debug files
+    modules and parameters are case insensitive.
+    Additional Parameters can be added besides username and password.
+
+Syntax
+
+conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File> 
+       <Password<\&par1=val1\&par2=val2>(optional) or Pass_File> <Portal Type> 
+       <DISABLE_CHECK>(optional) <DEBUG=file>(optional) <LOG=file>(optional)
+       <THREAD=n>(optional)
+
+Conformer at a bare minimum needs to be provided a host, username/file, password/file and module
+
+Ex.
+conformer.sh outlook.office.com ~/path/to/username/file Password1 Office365
+conformer.sh 192.168.10.5 testuser Password1 SMB
+
+Each Conformer module has a function that performs a basic check if the webpage has the portal password guessing is attempted on, (this can be bypassed with the "disable_check" parameter, should be used if basic check is wrong and falls to identify the portal as correct.)
+
+Ex. 
+# In this example, conformer is being used against google.com with the CiscoSSLVPN, the expected reply is that the portal is not compatible.
+conformer.sh google.com testuser Password1 CiscoSSLVPN
+Either not a CiscoSSLVPN portal, or not compatible version.
+Exiting...
+
+# Using disable_check, allows the basic check made to be bypassed, conformer attempted the password guessing attempt, but since the server replied in an unexpected way still the message "--- Page not responding properly." was presented. In this case password guessing will not work against the portal. (If you see this randomly against some users in a password spray, but not all, it is possible that the server replied differently for those, this could be due to network connection, WAF, blacklisted, time-out, etc.)
+conformer.sh google.com testuser Password1 CiscoSSLVPN disable_check
+
+Host: google.com
+    testuser:Password1:Fail --- Page not responding properly.
+
+# You can also add the DEBUG=~/Path/to/debug/file as an option to see the parameters sent to the server, and the server response back. (Note the Gmail module is used in this example)
+conformer.sh mail.google.com testuser Password1 Gmail debug=~/Desktop/conformer.debug
+
+Host: mail.google.com
+    testuser:Password1:Fail
+
+cat ~/Desktop/conformer.debug
+host:mail.google.com username:testuser password:Password1
+
+<HTML>
+<HEAD>
+<TITLE>Unauthorized</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+<H1>Unauthorized</H1>
+<H2>Error 401</H2>
+</BODY>
+</HTML>
+
+
+Conformer can take usernames or userfiles, passwords or password files, Password equals Username, or providing a combofile in the format (:username:password) per line
+
+Ex.# Using a username and password
+
+conformer.sh mail.google.com Bob Password Gmail
+
+Host: mail.google.com
+ Bob:Password:Fail
+
+# Using a userfile and password
+
+conformer.sh mail.google.com ~/Desktop/usernames Password1 Gmail
+
+Host: mail.google.com
+ Bob:Password1:Fail
+ Alice:Password1:Fail
+ Mal:Password1:Fail
+ Chuck:Password1:Fail
+ Dan:Password1:Fail
+
+# Using a username and password file
+
+conformer.sh mail.google.com Bob ~/Desktop/passfile Gmail
+
+Host: mail.google.com
+ Bob:Password1:Fail
+ Bob:Welcome1:Fail
+ Bob:Password123:Fail
+
+# Using a userfile and password file
+
+conformer.sh mail.google.com ~/Desktop/usernames ~/Desktop/passfile Gmail
+
+Host: mail.google.com
+ Bob:Password1:Fail
+ Bob:Welcome1:Fail
+ Bob:Password123:Fail
+ Alice:Password1:Fail
+ Alice:Welcome1:Fail
+ Alice:Password123:Fail
+ Mal:Password1:Fail
+ Mal:Welcome1:Fail
+ Mal:Password123:Fail
+ Chuck:Password1:Fail
+ Chuck:Welcome1:Fail
+ Chuck:Password123:Fail
+ Dan:Password1:Fail
+ Dan:Welcome1:Fail
+ Dan:Password123:Fail
+
+# Password = Username
+
+conformer.sh mail.google.com ~/Desktop/usernames @SAME@ Gmail
+
+Host: mail.google.com
+ Bob:Bob:Fail
+ Alice:Alice:Fail
+ Mal:Mal:Fail
+ Chuck:Chuck:Fail
+ Dan:Dan:Fail
+
+# Combo File
+cat combofile.list:Bob:Welcome1
+:Alice:Password123
+:Mal:Example18
+:Chuck:Summer18
+:Dan:Spring2018
+
+#When using a combo file, put combo in the username field to indicate this is a combo file attack, and in the password field provide the combo list.
+conformer.sh mail.google.com combo Desktop/combofile.list Gmail
+
+Host: mail.google.com
+ Bob:Welcome1:Fail
+ Alice:Password123:Fail
+ Mal:Example18:Fail
+ Chuck:Summer18:Fail
+ Dan:Spring2018:Fail
+
+
+Conformer can be used on non default ports, as well as having additional parameters added in situations where the web portal has additional parameters sent to the server such as domain name, group name, MFA, etc. These additional parameters can be determined by scraping the web form, or by intercepting the web traffic (burp proxy, ZAP proxy)
+
+Ex.# This example is redacted, but is used against a CiscoSSLVPN portal with an additional group field. The "\&" is required to indicate the "&" is not being used as it is traditionally in bash. (in a password file you would use the same format password&par1=val1 without the need of the "\")conformer.sh <hostname> <username> Password1\&group_list="VPN_Group1" CiscoSSLVPN
+Host: <host>
+ <username>:Pasword1&group_list=VPN_Group1:**Success**
+# If the additional parameter wasn't provided, there wouldn't be an error indicated, rather you would just receive a fail, this should be something to be careful of to not waste time.conformer.sh <hostname> <username> Password1 CiscoSSLVPN
+Host: <host>
+ <username>:Pasword1:Fail
+# If portal is on a different port, just add a ":" and port number attached to the host.conformer.sh <hostname>:8080 <username> Password1\&group_list="VPN_Group1" CiscoSSLVPN
+Host: <host>
+ <username>:Pasword1&group_list=VPN_Group1:**Success**
