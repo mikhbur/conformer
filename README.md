@@ -9,18 +9,3 @@ usage: conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File>
        <Password<\&par1=val1\&par2=val2>(optional) or Pass_File> <Portal Type> 
        <DISABLE_CHECK>(optional) <DEBUG=file>(optional) <LOG=file>(optional)
        <THREAD=n>(optional)
-
-Portal Types: SonicWallVOffice
-              CiscoSSLVPN
-              Netscaler
-	      OWA (versions 2013/2016)
-              Gmail (Host: mail.google.com) (Google throttling authentication attempts)
-              Office365 (Host: outlook.office.com)
-              PaloAlto (GlobalProtect)
-              SharePoint
-              XenMobile
-              XenApp (Incomplete)
-              Okta (Incomplete)
-              AUTO (Attempt autodetect module)
-              --------------------------------
-              SMB (Windows Auth. / supports NT Hash)
