@@ -12,10 +12,12 @@ source $mydir/modules/SharePoint.sh &> /dev/null;
 source $mydir/modules/AUTO.sh &> /dev/null;
 source $mydir/modules/SMB.sh &> /dev/null;
 source $mydir/modules/XenMobile.sh &> /dev/null;
+source $mydir/modules/Okta.sh &> /dev/null;
+source $mydir/modules/XenApp.sh &> /dev/null;
 
 #Help Banner Function...
 Help_banner(){
-if [[ ! -f $mydir/modules/SonicWallVOffice.sh ]] || [[ ! -f $mydir/modules/CiscoSSLVPN.sh ]] || [[ ! -f $mydir/modules/Netscaler.sh ]] || [[ ! -f $mydir/modules/OWA2016.sh ]] || [[ ! -f $mydir/modules/Gmail.sh ]] || [[ ! -f $mydir/modules/Office365.sh ]] || [[ ! -f $mydir/modules/PaloAlto.sh ]] || [[ ! -f $mydir/modules/SharePoint.sh ]] || [[ ! -f $mydir/modules/AUTO.sh ]] || [[ ! -f $mydir/modules/SMB.sh ]] || [[ ! -f $mydir/modules/XenMobile.sh ]]; then
+if [[ ! -f $mydir/modules/SonicWallVOffice.sh ]] || [[ ! -f $mydir/modules/CiscoSSLVPN.sh ]] || [[ ! -f $mydir/modules/Netscaler.sh ]] || [[ ! -f $mydir/modules/OWA2016.sh ]] || [[ ! -f $mydir/modules/Gmail.sh ]] || [[ ! -f $mydir/modules/Office365.sh ]] || [[ ! -f $mydir/modules/PaloAlto.sh ]] || [[ ! -f $mydir/modules/SharePoint.sh ]] || [[ ! -f $mydir/modules/AUTO.sh ]] || [[ ! -f $mydir/modules/SMB.sh ]] || [[ ! -f $mydir/modules/XenMobile.sh ]] || [[ ! -f $mydir/modules/Okta.sh ]]; then
 echo "Not All Modules Loaded.";
 echo "Exiting...";
 exit 1;
@@ -23,7 +25,7 @@ else
 :
 fi
 
-echo "conformer v0.5.7";
+echo "conformer v0.5.9";
 echo "bk201@foofus.net";
 echo "";
 echo "usage: conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File> 
@@ -35,11 +37,13 @@ echo "Portal Types: SonicWallVOffice
               CiscoSSLVPN
               Netscaler
 	      OWA (versions 2013/2016)
-              Gmail (Host: mail.google.com)
+              Gmail (Host: mail.google.com) (Google throttling authentication attempts)
               Office365 (Host: outlook.office.com)
               PaloAlto (GlobalProtect)
               SharePoint
               XenMobile
+              XenApp (Incomplete)
+              Okta (Incomplete)
               AUTO (Attempt autodetect module)
               --------------------------------
               SMB (Windows Auth. / supports NT Hash)"; #XenApp";
@@ -145,6 +149,10 @@ elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "sharepoint" ]]; then
 	check_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "xenmobile" ]]; then
 	check_XenMobile "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "xenapp" ]]; then
+	check_XenApp "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "okta" ]]; then
+	check_Okta "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "auto" ]]; then
 	check_Start "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4" | tr '[:upper:]' '[:lower:]')  == "smb" ]]; then
@@ -202,7 +210,7 @@ fi
 fi
 
 echo "";
-if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "netscaler" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "xenmobile" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "paloalto" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sharepoint" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "smb" ]] ; then
+if [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "ciscosslvpn" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "netscaler" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "xenmobile" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sonicwallvoffice" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "paloalto" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "owa" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "sharepoint" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "okta" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "xenapp" ]] || [[ $(echo "$4" | tr '[:upper:]' '[:lower:]') == "smb" ]] ; then
 echo "Host: $1";
 if [[ $LOG_YES == true ]]; then
 	echo "Host: $1" >> "$LOG";
@@ -268,6 +276,10 @@ elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "sharepoint" ]]; then
 	POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenmobile" ]]; then
 	POST_XenMobile "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenapp" ]]; then
+	POST_XenApp "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
+elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "okta" ]]; then
+	POST_Okta "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
 	SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
 fi
@@ -308,6 +320,10 @@ if [[ $(echo "$2" | tr '[:upper:]' '[:lower:]') == "combo" ]] ; then
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenmobile" ]]; then
 			POST_XenMobile "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenapp" ]]; then
+			POST_XenApp "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "okta" ]]; then
+			POST_Okta "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
 			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
@@ -347,6 +363,10 @@ else
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenmobile" ]]; then
 			POST_XenMobile "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenapp" ]]; then
+			POST_XenApp "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "okta" ]]; then
+			POST_Okta "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
 			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
@@ -394,6 +414,10 @@ if [ ! -f "$3" ]; then
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenmobile" ]]; then
 			POST_XenMobile "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenapp" ]]; then
+			POST_XenApp "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "okta" ]]; then
+			POST_Okta "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
 			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
@@ -427,6 +451,10 @@ else
 			POST_SharePoint "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenmobile" ]]; then
 			POST_XenMobile "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "xenmobile" ]]; then
+			POST_XenApp "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
+		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "okta" ]]; then
+			POST_Okta "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		elif [[ $(echo "$4"  | tr '[:upper:]' '[:lower:]') == "smb" ]]; then
 			SMB_AUTH "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" &
 		fi
