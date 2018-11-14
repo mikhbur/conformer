@@ -25,13 +25,13 @@ else
 :
 fi
 
-echo "conformer v0.5.9";
+echo "conformer v0.6.1";
 echo "bk201@foofus.net";
 echo "";
 echo "usage: conformer.sh <HOST_IP/Hostname><:PORT>(optional) <Username or Users_File> 
        <Password<\\&par1=val1\\&par2=val2>(optional) or Pass_File> <Portal Type> 
        <DISABLE_CHECK>(optional) <DEBUG=file>(optional) <LOG=file>(optional)
-       <THREAD=n>(optional)";
+       <THREAD=n>(optional) <SLEEP=n(seconds)(optional)>";
 echo "";
 echo "Portal Types: SonicWallVOffice
               CiscoSSLVPN
@@ -50,16 +50,18 @@ echo "Portal Types: SonicWallVOffice
 
 
 echo "";
-echo "Type @SAME@ : Password=Username"
-echo "DISABLE_CHECK : Disable Check if compatible Portal.";
-echo "DEBUG : outputs HTTP responses to file";
-echo "LOG : outputs stdout to file"
-echo "THREAD : Threading of POST requests to server"
+echo "Type @SAME@ - Password=Username"
+echo "DISABLE_CHECK - Disable Check if compatible Portal.";
+echo "DEBUG - outputs HTTP responses to file";
+echo "LOG - outputs stdout to file"
+echo "THREAD - Threading of POST requests to server"
+echo "SLEEP - Delay between POST requests to server, good if suspect of being throttled/blacklisted."
+echo "SLEEP and THREAD cannot be used together!."
 echo "";
 echo "syntax examples.";
-echo "conformer.sh update"
 echo "conformer.sh domain.example.com username ~/Desktop/passwords CiscoSSLVPN";
 echo "conformer.sh domain.example.com ~/Desktop/users ~/Desktop/passwords OWA THREAD=10";
+echo "conformer.sh mail.google.com ~/Desktop/users ~/Desktop/passwords Gmail SLEEP=15";
 echo "conformer.sh domain.example.com username password123 Gmail LOG=~/Desktop/log DEBUG=~/Desktop/debug";
 echo "conformer.sh domain.example.com ~/Desktop/users Password1 Netscaler DISABLE_CHECK DEBUG=~/Desktop/debug";
 echo "conformer.sh domain.example.com combo ~/Desktop/combofile(:user:pass) Netscaler";
@@ -70,18 +72,17 @@ echo "";
 parameter_check(){
 #Where script would Update
 if [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "update" ]]; then
-rm conformer.sh;
-wget https://raw.githubusercontent.com/mikhbur/conformer/master/conformer.sh &> /dev/null;
-chmod +x conformer.sh;
-wget --timeout=4 -qO- https://github.com/mikhbur/conformer/tree/master/modules -O TODOWNLOAD;
-rm -r modules;
-mkdir modules;
-for i in $(cat TODOWNLOAD | tr ' ' '/' | tr '"' '/' | cut -d "/" -f 25 |  grep ".sh"); do
-
-wget https://raw.githubusercontent.com/mikhbur/conformer/master/modules/$i -O modules/$i &> /dev/null;
-
-done
-rm TODOWNLOAD;
+echo "Not Available Option.";
+#rm conformer.sh;
+#wget https://raw.githubusercontent.com/mikhbur/conformer/master/conformer.sh &> /dev/null;
+#chmod +x conformer.sh;
+#wget --timeout=4 -qO- https://github.com/mikhbur/conformer/tree/master/modules -O TODOWNLOAD;
+#rm -r modules;
+#mkdir modules;
+#for i in $(cat TODOWNLOAD | tr ' ' '/' | tr '"' '/' | cut -d "/" -f 25 |  grep ".sh"); do
+#wget https://raw.githubusercontent.com/mikhbur/conformer/master/modules/$i -O modules/$i &> /dev/null;
+#done
+#rm TODOWNLOAD;
 
 elif [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "help" ]] || [[ $(echo "$1" | tr '[:upper:]' '[:lower:]') == "--help" ]] || [[ $(echo "$1" | tr '[:upper:]' '[:lower:]')  == "-h" ]]; then
 Help_banner "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8";
@@ -243,6 +244,21 @@ THREAD=$(echo "$5" | tr '[:upper:]' '[:lower:]' | grep thread | cut -d "=" -f 2)
 	fi
 fi
 
+#Determine if/how long sleep
+Sleep=0;
+if [[ $(echo "$5" | tr '[:upper:]' '[:lower:]') == "sleep="* ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "sleep="* ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "sleep="* ]] || [[ $(echo "$8" | tr '[:upper:]' '[:lower:]') == "sleep="* ]]; then
+Sleep=$(echo "$5" | tr '[:upper:]' '[:lower:]' | grep "sleep" | cut -d "=" -f 2);
+	if [[ "$Sleep" == "" ]] ; then
+		Sleep=$(echo "$6" | tr '[:upper:]' '[:lower:]' | grep "sleep" | cut -d "=" -f 2);
+		if [[ "$Sleep" == "" ]] ; then
+			Sleep=$(echo "$7" | tr '[:upper:]' '[:lower:]' | grep "sleep" | cut -d "=" -f 2);
+			if [[ "$Sleep" == "" ]] ; then
+				Sleep=$(echo "$8" | tr '[:upper:]' '[:lower:]' | grep "sleep" | cut -d "=" -f 2);
+			fi
+		fi
+	fi
+fi
+
 #Determine if username file or username?
 if [ ! -f "$2" ]; then
 #Determine if password file or password?
@@ -331,6 +347,9 @@ if [[ $(echo "$2" | tr '[:upper:]' '[:lower:]') == "combo" ]] ; then
 		wait $!;
 		com=0;
 		fi
+
+		sleep "$Sleep"s;
+
 	done
 	wait;
 
@@ -374,6 +393,10 @@ else
 		wait $!;
 		com=0;
 		fi
+
+		sleep "$Sleep"s;
+
+
 	done
 	wait;
 fi
@@ -425,6 +448,9 @@ if [ ! -f "$3" ]; then
 		wait $! 2> /dev/null;
 		com=0;
 		fi
+
+		sleep "$Sleep"s;
+
 	done
 	wait;
 
@@ -462,6 +488,9 @@ else
 		wait $!;
 		com=0;
 		fi
+
+		sleep "$Sleep"s;
+
 	done
 	wait
 done

